@@ -1,2 +1,2 @@
-AUTHY_API_KEY = "8xYQEKqjms1OG2KzC2EowICckNHkQXzO"
+AUTHY_API_KEY = "<AUTHY-API-KEY>"
 SECRET_KEY = "myanmeissaumopal"
