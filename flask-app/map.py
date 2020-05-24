@@ -41,7 +41,7 @@ def map_func():
         cases = Case.query.all()
         case_schema = CaseSchema(many=True)
         output = case_schema.dump(cases)
-        return render_template('home.html', apikey='pK5yH0jJ-ZpsIokaaLFkOJuv8sv1QASAIOc-Isrn86E', cases=output)
+        return render_template('home.html', apikey='<HERE-API-KEY>', cases=output)
 
 @app.route('/cases', methods=['POST', 'GET'])
 def case_func():
@@ -62,7 +62,7 @@ def case_func():
         cases_all = Case.query.all()
         case_schema = CaseSchema(many=True)
         output = case_schema.dump(cases_all)
-        return render_template('analysis.html', apikey='pK5yH0jJ-ZpsIokaaLFkOJuv8sv1QASAIOc-Isrn86E', cases=cases, heatmap=output)
+        return render_template('analysis.html', apikey='<HERE-API-KEY>', cases=cases, heatmap=output)
 
 @app.route('/bookings', methods=['POST','GET'])
 def book_func():
@@ -83,7 +83,7 @@ def book_func():
         cases_all = Case.query.all()
         case_schema = CaseSchema(many=True)
         output = case_schema.dump(cases_all)
-        return render_template('booking.html', apikey='pK5yH0jJ-ZpsIokaaLFkOJuv8sv1QASAIOc-Isrn86E', cases=output)
+        return render_template('booking.html', apikey='<HERE-API-KEY>', cases=output)
 
 @app.route('/tickets')
 def ticket_func():
