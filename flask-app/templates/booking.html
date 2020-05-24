@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div id="store-info">
+    <h3 id="here"></h3>
+    <h4>Grocery Store</h4>
+    <h5>Timings: 9am to 6pm (allows 30 people/hour)</h5>
+</div>
+
+<form action="/bookings" method="POST">
+    <label for="date">Date:</label>
+    <input type="date" id="date" name="date">
+    <select name="time">
+        <option value="9">9 am</option>
+        <option value="10">10 am</option>
+        <option value="11">11 am</option>
+        <option value="12">12 pm</option>
+        <option value="1">1 pm</option>
+        <option value="2">2 pm</option>
+        <option value="3">3 pm</option>
+        <option value="4">4 pm</option>
+        <option value="5">5 pm</option>
+    </select>
+    <input type="submit">
+</form>
+
+<div id="fastest-route" style="margin-top:20px">
+    <h4 style="text-align:center">Safest Route from Your Place</h4>
+</div>
+
+<div id="mapContainer" style="margin-top: 10px; width: 100%; height: 70vh; background: #39B6B3;">
+    <div id="panel"></div>
+</div>
+{% endblock %}
+
+
+
+{% block extra_scripts %}
+<script>
+    var targetLat, targetLng;
+    window.onload = function () {
+        var url = document.location.href,
+            params = url.split('?')[1].split('&'),
+            data = {},
+            tmp;
+        for (var i = 0, l = params.length; i < l; i++) {
+            tmp = params[i].split('=');
+            data[tmp[0]] = tmp[1].replace(/%20/g, " ");
+        }
+        document.getElementById('here').innerHTML = data.title;
+        targetLat = data.lat;
+        targetLng = data.lng;
+
+        var myPos = {
+            lat: 23.53232,
+            lng: 87.30735
+        };
+
+        console.log(targetLat.toString() + ',' + targetLng.toString())
+
+        var restrictedCoords = '';
+        
+        function circleToRect(coord){
+            var latitudeCenter = coord.latitude;     
+            var longitudeCenter = coord.longitude;    
+            var radius = coord.radius/1000;             
+            var RADIUS_EARTH = 6371;      
+ 
+            var latitudeNE  = latitudeCenter  + (180/Math.PI)*(radius / RADIUS_EARTH);
+            var longitudeNE = longitudeCenter + (180/Math.PI)*(radius / RADIUS_EARTH / Math.cos((Math.PI/180)*(latitudeCenter)));
+ 
+            var latitudeSW  = latitudeCenter  - (180/Math.PI)*(radius / RADIUS_EARTH);
+            var longitudeSW = longitudeCenter - (180/Math.PI)*(radius / RADIUS_EARTH / Math.cos((Math.PI/180)*(latitudeCenter))); 
+            return latitudeNE.toString() + ',' + longitudeNE.toString() + ';' + latitudeSW.toString() + ',' + longitudeSW.toString();
+        }
+
+        var data1 = {{ cases|safe }};
+        for(i=0; i<data1.length; i++){
+            if(i==0){
+                restrictedCoords = restrictedCoords + circleToRect(data1[i]);
+            }
+            else {
+                restrictedCoords = restrictedCoords + '!' + circleToRect(data1[i]);
+            }        
+        }
+
+        console.log(restrictedCoords);
+
+        function calculateRouteFromAtoB(platform) {
+            var router = platform.getRoutingService(),
+                routeRequestParams = {
+                    mode: 'fastest;pedestrian',
+                    representation: 'display',
+                    waypoint0: myPos.lat.toString() + ',' + myPos.lng.toString(),
+                    waypoint1: targetLat + ',' + targetLng,
+                    routeattributes: 'waypoints,summary,shape,legs',
+                    maneuverattributes: 'direction,action',
+                    avoidareas: restrictedCoords
+                };
+
+
+            router.calculateRoute(
+                routeRequestParams,
+                onSuccess,
+                onError
+            );
+        }
+
+        function onSuccess(result) {
+            var route = result.response.route[0];
+            addRouteShapeToMap(route);
+            addSummaryToPanel(route.summary);
+        }
+
+        function onError(error) {
+            alert('Can\'t reach the remote server');
+        }
+
+        var mapContainer = document.getElementById('mapContainer'),
+            routeInstructionsContainer = document.getElementById('panel');
+
+        var platform = new H.service.Platform({
+            apikey: "{{ apikey }}"
+        });
+        var defaultLayers = platform.createDefaultLayers();
+
+        var map = new H.Map(mapContainer,
+            defaultLayers.vector.normal.map, {
+                center: {
+                    lat: myPos.lat,
+                    lng: myPos.lng
+                },
+                zoom: 15,
+            });
+        window.addEventListener('resize', () => map.getViewPort().resize());
+
+        var behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+
+        var ui = H.ui.UI.createDefault(map, defaultLayers);
+
+        function addRouteShapeToMap(route) {
+            var lineString = new H.geo.LineString(),
+                routeShape = route.shape,
+                polyline;
+
+            routeShape.forEach(function (point) {
+                var parts = point.split(',');
+                lineString.pushLatLngAlt(parts[0], parts[1]);
+            });
+
+            polyline = new H.map.Polyline(lineString, {
+                style: {
+                    lineWidth: 4,
+                    strokeColor: 'rgba(0, 128, 255, 0.7)'
+                }
+            });
+            map.addObject(polyline);
+            map.getViewModel().setLookAtData({
+                bounds: polyline.getBoundingBox()
+            });
+        }
+
+        function addSummaryToPanel(summary) {
+            var summaryDiv = document.createElement('div'),
+                content = '';
+            content += 'Total distance: ' + summary.distance + 'm. ';
+            content += 'Travel Time: ' + summary.travelTime.toMMSS() + ' (in current traffic)';
+
+
+            summaryDiv.style.fontSize = 'small';
+            summaryDiv.style.marginLeft = '5%';
+            summaryDiv.style.marginRight = '5%';
+            summaryDiv.innerHTML = content;
+            routeInstructionsContainer.appendChild(summaryDiv);
+        }
+
+        Number.prototype.toMMSS = function () {
+            return Math.floor(this / 60) + ' minutes ' + (this % 60) + ' seconds.';
+        }
+
+        var customStyle = {
+            strokeColor: 'pink',
+            fillColor: 'rgba(254 ,132, 132, 0.2)',
+            lineWidth: 0,
+        };
+    
+        function drawCircle(position, range) {
+            var circle = new H.map.Circle(position, range, {
+                style: customStyle
+            })
+            map.addObject(circle)
+        };
+
+        console.log({{ cases|safe }})
+        var data = {{ cases|safe }};
+        for (i = 0; i < data.length; i++) {
+            drawCircle({
+                lat: data[i].latitude,
+                lng: data[i].longitude
+            }, data[i].radius);
+        }
+        calculateRouteFromAtoB(platform);
+    }
+</script>
+{% endblock %}

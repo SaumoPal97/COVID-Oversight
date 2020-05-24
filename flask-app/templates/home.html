@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<form autocomplete="off">
+    <div class="text-center autocomplete" style="margin-left:40px;">
+        <input type="search" id="search" placeholder="Search Here">
+    </div>
+</form>
+<div style="margin-top: 15px;">
+    <a class="button1" href="#" onClick="displayGrocery()">Grocery</a>
+    <a class="button1" href="#">Hotels</a>
+    <a class="button1" href="#">Restaurants</a></div>
+<div id="mapContainer" style="margin-top: 10px; width: 100%; height: 70vh; background: #39B6B3;">
+</div>
+<form action="/" method="POST" style="text-align:center;">
+    <input type="submit" style="margin-top: 10px;margin-bottom: 10px;color: rgb(18,125,231); width: 200px" value="Seek Help">
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    var platform = new H.service.Platform({
+        'apikey': '{{ apikey }}'
+    });
+
+    var myPos = {
+        lat: 23.53232,
+        lng: 87.30735
+    };
+
+    var maptypes = platform.createDefaultLayers();
+    var map = new H.Map(
+        document.getElementById('mapContainer'),
+        maptypes.raster.terrain.map, {
+            zoom: 15,
+            center: {
+                lat: myPos.lat,
+                lng: myPos.lng
+            }
+        });
+
+    var mapEvents = new H.mapevents.MapEvents(map);
+    var behavior = new H.mapevents.Behavior(mapEvents);
+
+    //add my location
+    var marker = new H.map.Marker({
+        lat: myPos.lat,
+        lng: myPos.lng
+    }, {
+        icon: new H.map.Icon("https://image.flaticon.com/icons/svg/2922/2922472.svg", {
+            size: {
+                w: 64,
+                h: 64
+            }
+        })
+    });
+    map.addObject(marker);
+
+    var ui = H.ui.UI.createDefault(map, maptypes);
+
+    //add info bubble
+    function addMarkerToGroup(customIcon, group, coordinate, html) {
+        var marker = new H.map.Marker(coordinate, {
+            icon: customIcon
+        });
+        marker.setData(html);
+        group.addObject(marker);
+    }
+
+    function addInfoBubble(newPos, map, customIcon, title) {
+        var group = new H.map.Group();
+        map.addObject(group);
+        group.addEventListener('tap', function (evt) {
+            var bubble = new H.ui.InfoBubble(evt.target.getGeometry(), {
+                content: evt.target.getData()
+            });
+            ui.addBubble(bubble);
+        }, false);
+
+        addMarkerToGroup(customIcon, group, {
+                lat: newPos.lat,
+                lng: newPos.lng
+            },
+            '<div><a href="/bookings?title=' + title + '&lat=' + newPos.lat + '&lng=' + newPos.lng + '">' + title +
+            '</a>'+'<div>Queue: 7/30</div>');
+    }
+
+    //add clustering
+    function addMarker(newPos, customIcon) {
+        var Marker = new H.map.Marker(newPos, {
+            icon: customIcon
+        });
+        map.addObject(Marker);
+    };
+
+    function startClustering(map, data) {
+        console.log(data);
+        var dataPoints = data.map(function (item) {
+            return new H.clustering.DataPoint(item.latitude, item.longitude);
+        });
+
+        var clusteredDataProvider = new H.clustering.Provider(dataPoints, {
+            clusteringOptions: {
+                eps: 32,
+                minWeight: 2
+            }
+        });
+
+        var clusteringLayer = new H.map.layer.ObjectLayer(clusteredDataProvider);
+        map.addLayer(clusteringLayer);
+    }
+
+    startClustering(map, {{cases|safe }});
+
+    //ADD CIRCLE
+    var customStyle = {
+        strokeColor: 'pink',
+        fillColor: 'rgba(254 ,132, 132, 0.2)',
+        lineWidth: 0,
+    };
+    
+    function drawCircle(position, range) {
+        var circle = new H.map.Circle(position, range, {
+            style: customStyle
+        })
+        map.addObject(circle)
+    };
+
+    console.log({{ cases|safe }})
+    var data = {{ cases|safe }};
+    for (i = 0; i < data.length; i++) {
+        drawCircle({
+            lat: data[i].latitude,
+            lng: data[i].longitude
+        }, data[i].radius);
+    }
+
+
+    //add grocery stores
+    var clickCount = 0;
+
+    function displayGrocery() {
+        clickCount += 1;
+        let params = {
+            "at": myPos.lat + ',' + myPos.lng,
+            "r": 15,
+            "q": "grocery",
+            "in": "countryCode:IND"
+        };
+
+        let query = Object.keys(params)
+            .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
+            .join('&');
+
+        let url = "https://discover.search.hereapi.com/v1/discover?" + query;
+        var myHeaders = new Headers();
+        myHeaders.append("Authorization",
+            "Bearer eyJhbGciOiJSUzUxMiIsImN0eSI6IkpXVCIsImlzcyI6IkhFUkUiLCJhaWQiOiJORjE4MlBWQ3RxMHZ2eERxUmlSYiIsImlhdCI6MTU5MDMxNTAzOSwiZXhwIjoxNTkwNDAxNDM5LCJraWQiOiJqMSJ9.ZXlKaGJHY2lPaUprYVhJaUxDSmxibU1pT2lKQk1qVTJRMEpETFVoVE5URXlJbjAuLlp3V3g4eTY0SHBVbGxhQWZQWnJKMGcuV3ZfckRwS2ZDTFFCWnJvVUZsLURWcXJfVDhJaVBFUkZCb2p6OXdnZ3VwY0dqR0E4ckVFZ0tDakZYSm5BTG5VTS1XQjhTOGNEV2JjRVlVbXZxQmt0RlNXb2hZV3l3MjVnOC1GVXhBWGdWX0d1RHdCTVpNWFpGS0cyZFdabFZUQVYuMDhnS0Mtblc0cXNkTW5HU2JJZ1YtT2pIN3NjZjlMVjlYZVQ0ZWVzeDZwcw.awvy80peX7AZjQDfGAoFsPYHDtIzE7yYxjxPIRQgkIBkpAJpd7j5QTqqZWdC1IZJEr1qyxn8XpXaTadcBeA_dLi8f9UGg5ZDX2dAbGc7FPUKvzKvRgRh21FztF2UipWgtk8viYtJaAXwsuLGbCiyP0eNbg-ytoiUfb32YInUj7CfE6P7TlDC7wA6OWdtqrduVugJJxKc-1ZEovwIz7XJEoFSUsXRJJEzT7Ps8l7o6dAlKbXhoG1QFWJsJdA_F9L0lz47LVit35vMUgSrNK0T8NvaR5Yph7aOIqL596IDGehHk3v4JTYmfarZKIcn8SMTqHMyXAYSKzcjzZujk6ptSg"
+        );
+
+        var requestOptions = {
+            method: 'GET',
+            headers: myHeaders,
+            redirect: 'follow'
+        };
+
+        var customIcon = new H.map.Icon("https://image.flaticon.com/icons/svg/2934/2934273.svg", {
+            size: {
+                w: 32,
+                h: 32
+            }
+        })
+        fetch(url, requestOptions)
+            .then(response => response.json())
+            .then(results => {
+                console.log(results)
+                for (i = 0; i < results.items.length; i++) {
+                    newPos = ({
+                        lat: results.items[i].position.lat,
+                        lng: results.items[i].position.lng
+                    });
+                    addInfoBubble(newPos, map, customIcon, results.items[i].title);
+                }
+            })
+            .catch(error => console.log('error', error));
+
+        if (clickCount % 2 == 0) {
+            location.reload();
+        }
+    };
+
+    var arr = ["The Mission Hospital, Durgapur 713212 WB",
+        "DR. B. C. Roy Nursing Home, Durgapur 713213 WB",
+        "Mamc Hospital, Durgapur 713214 WB",
+        "Joydev Health Center, Durgapur 713214 WB",
+        "Durgapur City Hospital & Clinic, Durgapur 713216 WB",
+        "The Mission Hospital City Center Clinic, Durgapur 713216 WB",
+        "Abl Hospital, Durgapur 713206 WB",
+        "Vivekananda Hospital, Durgapur 713206 WB",
+        "Mamc Hospital-ER, Durgapur 713214 WB",
+        "Government Hospital, Durgapur 713206 WB",
+        "Oliveira do Hospital, Coimbra, Portugal",
+        "Hospital More, Singur 712409 WB",
+        "Disha Eye Hospital, Durgapur 713208 WB",
+        "DPL Hospital, Durgapur 713202 WB",
+        "Durgapur S D Hospital Emp Co-op, Durgapur 713206 WB",
+        "Esi Hospital Durgapur, Durgapur 713206 WB",
+        "B Zone Primary Hospital, Durgapur 713214 WB",
+        "Durgapur City Hospital & Clinic-ER, Durgapur 713216 WB",
+        "Durgapur Sub Division Hospital-Main Gate, Durgapur 713206 WB",
+        "Durgapur Mahacuma Hospital, Durgapur 713206 WB"
+    ];
+    autocomplete(document.getElementById("search"), arr);
+</script>
+{% endblock %}

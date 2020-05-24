@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-top:20px">
+    <h3>Latest Tickets</h3>
+    {% for ticket in tickets %}
+    <h4>Token: {{ ticket.token }}</h4>
+    <h5>Date: {{ ticket.date }}</h5>
+    <h5>Time Slot: {{ ticket.timeslot }}</h5>
+    <button id="myBtn">
+    {% if loop.index % 3 != 0 %}
+    QR Code
+    {% else %}
+    Expired
+    {% endif %}
+    </button>
+    <hr>
+    {% endfor %}
+</div>
+
+<div id="myModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h4>Your entry code</h4>
+    <img src="{{ url_for('static',filename='download.png') }}" alt="QR Code">
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+
+var modal = document.getElementById("myModal");
+var btn = document.getElementById("myBtn");
+var span = document.getElementsByClassName("close")[0];
+
+btn.onclick = function() {
+  modal.style.display = "block";
+}
+
+span.onclick = function() {
+  modal.style.display = "none";
+}
+
+window.onclick = function(event) {
+  if (event.target == modal) {
+    modal.style.display = "none";
+  }
+}
+</script>
+{% endblock %}
